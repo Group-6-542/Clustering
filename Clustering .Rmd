@@ -1,0 +1,132 @@
+---
+title: "Clustering"
+output:
+  html_document:
+    df_print: paged
+---
+Partioning Technique:
+You will request a particular number of clusters to the algorithm. The algorithm will put every case in one of those clusters. Outliers will affect output.
+```{r}
+#uploading merged data file from Github
+link = 'https://raw.githubusercontent.com/Group-6-542/EmilyRepository/50e2502dfe3fde3a633f8ca193eb0c6ff76aafe5/mergedGroupDataFinal.csv'
+myfile = url(link) 
+
+#reading in data
+fromPy = read.csv(file = myfile)
+
+#reset indexes in R since they differ from python
+row.names(fromPy) = NULL
+```
+Preparing Data:
+Create a distance matrix
+
+step 1: Explore variables that will be used for clustering 
+```{r}
+dfClus = fromPy[,c( 'casesReported', 'numberOfReturns', 'avgAGI', 'culturalSpaces')]
+#make sure that column names match the column names in the merged file
+#we are using 4 variables for the subset dfClus
+#You can also create a subset of more or less variables
+
+summary(dfClus) #summary of results
+```
+
+Step 2: Rescale units if needed into a new variable 
+```{r}
+#Above summary shows different ranges (max value of variables greatly varies) 
+#so through standardization all values will have mean of zero
+
+dfClus=scale(dfClus) 
+#standardization scale.You do not have any units and avoids mistakes in clusters
+
+summary(dfClus)
+```
+
+Step 3: Rename subset indexes and verify what your input is:
+```{r}
+row.names(dfClus)=fromPy$zipcode 
+#rownames are now zipcodes 
+
+head(dfClus)
+```
+
+Step 4: Set random seed:
+```{r}
+set.seed(999) #for randomization, fair way to start. This makes sure that what one person computes, the other also gets similar result. So now everytime it starts from the same point. Replicability of results
+```
+
+Step 5: Decide distance method and compute distance matrix: 
+```{r}
+#library(cluster) - you do not need to use library if you are using cluster::daisy function  
+
+dfClus_D=cluster::daisy(x=dfClus) #distance calculated
+dfClus_D #using distance for partioning technique
+```
+
+Partioning Technique applied now
+
+Step 6: Indicate the number of clusters you require and apply function
+```{r}
+NumCluster=4 #number of clusters or categories that data will be sorted into
+
+#pam is a partioning technique 
+#library cluster has the function pam so can use that also
+res.pam = cluster::pam(x=dfClus_D,
+              k = NumCluster,
+              cluster.only = F) #get all information 
+```
+
+Clustering Results
+
+Step 7: Adding results to original data frame
+```{r}
+fromPy$pam=as.factor(res.pam$clustering)
+#convert into Categorical data 
+#pam variable created - can see in fromPy now
+```
+
+Step 8: Query Data frame as needed 
+Example: Finding zipcodes in cluster 1 
+```{r}
+fromPy[fromPy$pam==1,'zipcode'] # this shows zipcodes belonging to cluster group 1 
+```
+
+Step 9: Report: Table of Clusters
+
+```{r}
+table(fromPy$pam)
+#shows how many zipcodes in each cluster, so looking at table below: cluster 1 has 6 zipcodes, cluster 2 has 8 and so on
+```
+
+Evaluate Results
+
+Step 10: Report: Average Silhouettes 
+```{r}
+library(factoextra) #install this library and call it
+#res.pam shows the silinfo
+
+fviz_silhouette(res.pam)
+#silhouette is a measurement of how good was a cluster
+#higher value of silhouette - well clustered
+#lower value of silhouette - wrongly/poorly clustered
+#negative value of silhouette - should not be there
+```
+
+Report: Detecting Anomalies
+
+Step 11: Save individual silhouettes:
+```{r}
+pamEval=data.frame(res.pam$silinfo$widths) #turning into a data frame
+#pamEval data frame shows what cluster you belong and who is your neighbor
+
+#now we can check in pamEval which ones are poorly (negatively) clusetred
+head(pamEval)
+```
+
+Step 12: Request negative silhouettes: The ones that are poorly clustered.
+```{r}
+pamEval[pamEval$sil_width<0,]
+#Now the table above shows that 98109 has closest neighbor 4 but it was placed in cluster 1 or 98116 had closest neighbor 3 but it was put in cluster 2
+```
+
+Partioning technique complete. 
+
